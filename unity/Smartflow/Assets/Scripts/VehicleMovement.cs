@@ -6,9 +6,16 @@ public class VehicleMovement : MonoBehaviour
     [HideInInspector] public float targetSpeed; 
     [HideInInspector] public float laneOffset; // รับค่าเลนจาก Manager
     [HideInInspector] public List<Transform> waypoints; // จุดทั้งหมดที่ต้องวิ่งผ่าน
-
-    private float currentSpeed;
+// ... ตัวแปรต่างๆ ...
     private int currentWaypointIndex = 0;
+
+    // 🟢 สร้างฟังก์ชันนี้เพิ่ม เพื่อล้างค่าให้รถเหมือนเพิ่งออกจากโรงงาน 🟢
+    public void ResetVehicle()
+    {
+        currentWaypointIndex = 0;
+        currentSpeed = targetSpeed;
+    }
+    private float currentSpeed;
 
     [Header("Traffic AI Settings")]
     public float safeDistance = 5f; 
@@ -24,9 +31,11 @@ public class VehicleMovement : MonoBehaviour
     void Update()
     {
         // 1. ตรวจสอบว่าวิ่งครบทุกจุดหรือยัง (ถ้าครบแล้วให้ลบรถทิ้ง)
+       // 1. ตรวจสอบว่าวิ่งครบทุกจุดหรือยัง
         if (waypoints == null || currentWaypointIndex >= waypoints.Count)
         {
-            Destroy(gameObject);
+            // 🟢 เปลี่ยนจาก Destroy เป็นส่งคืน Pool 🟢
+            ScenarioManager.Instance.ReturnVehicleToPool(gameObject);
             return;
         }
 

@@ -11,7 +11,7 @@ public class VehicleSpawner : MonoBehaviour
     public float spawnDelay = 2f; // ระยะเวลาหน่วงระหว่างการสร้างรถแต่ละคัน
 
     // จำลองข้อมูล JSON ที่รับมา (ในงานจริงอาจจะรับมาจาก API หรืออ่านจากไฟล์)
-    private string mockJsonData = "{\"motorcycleCount\": 2, \"carCount\": 3}";
+    private string mockJsonData = "{\"motorcycleCount\": 8, \"carCount\": 10}";
 
     void Start()
     {
