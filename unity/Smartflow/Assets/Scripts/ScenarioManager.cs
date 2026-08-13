@@ -50,8 +50,15 @@ public class ScenarioManager : MonoBehaviour
     public WaypointRoute outboundRoute;  // เส้นทางขาออก
 
     // เปลี่ยน Mockup JSON ให้เป็นแบบใหม่
-    private string mockJsonData = "{\"flows\": [{\"direction\": \"inbound\", \"motorcycleCount\": 2, \"carCount\": 3}, {\"direction\": \"outbound\", \"motorcycleCount\": 1, \"carCount\": 2}]}";
+    private string mockJsonData = "{\"flows\": [{\"direction\": \"inbound\", \"motorcycleCount\": 2, \"carCount\": 15}, {\"direction\": \"outbound\", \"motorcycleCount\": 2, \"carCount\": 15}]}";
 
+
+    // เก็บข้อมูลว่ารถคันที่จะ Spawn ต้องเป็นประเภทไหน และวิ่งฝั่งไหน
+    public class SpawnTicket
+    {
+        public bool isMotorcycle;
+        public WaypointRoute route;
+    }
 
 
     [Header("Scenario Configurations")]
@@ -169,27 +176,55 @@ public class ScenarioManager : MonoBehaviour
 
     IEnumerator SpawnVehiclesRoutine(ScenarioConfig config)
     {
-        // 🟢 วนลูปอ่านข้อมูลทีละทิศทางจาก JSON
+        // 1. สร้างกล่องเปล่าเพื่อเก็บตั๋วรถทุกคัน
+        List<SpawnTicket> spawnBox = new List<SpawnTicket>();
+
+        // 2. อ่านข้อมูลจาก JSON แล้วสร้างตั๋วใส่ลงกล่อง
         foreach (TrafficFlow flow in vehicleCounts.flows)
         {
-            // เช็กเงื่อนไขว่า JSON ระบุว่าเป็น inbound หรือไม่ ถ้าใช่ให้ใช้เส้นทาง inbound ถ้าไม่ใช่ใช้ outbound
             WaypointRoute selectedRoute = (flow.direction.ToLower() == "inbound") ? inboundRoute : outboundRoute;
 
-            // สร้างมอเตอร์ไซค์ของทิศทางนี้
+            // ใส่ตั๋วมอเตอร์ไซค์
             for (int i = 0; i < flow.motorcycleCount; i++)
             {
-                int randomIndex = Random.Range(0, motorcyclePrefabs.Length);
-                SpawnSingleVehicle(motorcyclePrefabs[randomIndex], config, selectedRoute);
-                yield return new WaitForSeconds(spawnDelay);
+                spawnBox.Add(new SpawnTicket { isMotorcycle = true, route = selectedRoute });
             }
 
-            // สร้างรถยนต์ของทิศทางนี้
+            // ใส่ตั๋วรถยนต์
             for (int i = 0; i < flow.carCount; i++)
             {
-                int randomIndex = Random.Range(0, carPrefabs.Length);
-                SpawnSingleVehicle(carPrefabs[randomIndex], config, selectedRoute);
-                yield return new WaitForSeconds(spawnDelay);
+                spawnBox.Add(new SpawnTicket { isMotorcycle = false, route = selectedRoute });
             }
+        }
+
+        // 3. เริ่มหยิบตั๋วออกจากกล่องแบบสุ่มทีละใบ จนกว่ากล่องจะว่างเปล่า
+        while (spawnBox.Count > 0)
+        {
+            // สุ่มล้วงตั๋วขึ้นมา 1 ใบ
+            int randomIndex = Random.Range(0, spawnBox.Count);
+            SpawnTicket ticket = spawnBox[randomIndex];
+
+            // 4. เตรียม Prefab และเรียกใช้งาน
+            GameObject prefabToSpawn;
+            if (ticket.isMotorcycle)
+            {
+                int randomMotoModel = Random.Range(0, motorcyclePrefabs.Length);
+                prefabToSpawn = motorcyclePrefabs[randomMotoModel];
+            }
+            else
+            {
+                int randomCarModel = Random.Range(0, carPrefabs.Length);
+                prefabToSpawn = carPrefabs[randomCarModel];
+            }
+
+            // สั่ง Spawn รถ
+            SpawnSingleVehicle(prefabToSpawn, config, ticket.route);
+
+            // 5. หยิบตั๋วใบนี้ทิ้งไป จะได้ไม่ซ้ำ
+            spawnBox.RemoveAt(randomIndex);
+
+            // รอเวลาหน่วงก่อนหยิบตั๋วใบถัดไป
+            yield return new WaitForSeconds(spawnDelay);
         }
     }
 
