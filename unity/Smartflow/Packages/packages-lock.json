@@ -9,6 +9,15 @@
       },
       "hash": "00e176cdc31b1cd06bdc556ac919f9bcd166d7ee"
     },
+    "com.unity.ai.navigation": {
+      "version": "2.0.16",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.ai": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
     "com.unity.bindings.openimageio": {
       "version": "1.0.2",
       "depth": 1,

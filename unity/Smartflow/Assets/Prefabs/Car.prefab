@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 3102081184621904630}
   - component: {fileID: 401897699248771635}
   - component: {fileID: 5629198313659671964}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Car
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -133,6 +133,9 @@ MonoBehaviour:
   acceleration: 2
   turnSpeed: 5
   stopDistance: 1.5
+  obstacleLayer:
+    serializedVersion: 2
+    m_Bits: 64
 --- !u!1001 &3636529515140751513
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -197,9 +200,133 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -8409194071608353932, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -8386688732603455166, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -8357194537887903664, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -8183251500480574695, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -6959451462935859886, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -5500577357691644035, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -5421080802542520860, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -3960857725164579013, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -3945256893263072049, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -3315954688725367957, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -2736595576220908246, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -2310968488721192984, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -185972628663330464, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
       propertyPath: m_Name
       value: audi_a7_55_tfsi
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 1126710260937486377, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 1491659931768936914, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 2821307563109139104, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 3044111030097957752, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 3160653175714988288, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 3485597339631876611, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 3604334434075868550, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 3959455851331263597, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 4483842319120179522, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 4886956049180226582, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 5323976877635903834, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 6327330811218233237, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 7259086051371559197, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 8396608992570630806, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 8407419793661247010, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 8442719514454002972, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 8538935225766194035, guid: 50d2596e6f2670948bdea6496ca61a4d, type: 3}
+      propertyPath: m_Layer
+      value: 6
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

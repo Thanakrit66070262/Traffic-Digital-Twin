@@ -7,7 +7,7 @@ public class VehicleMovement : MonoBehaviour
     [HideInInspector] public float laneOffset; // รับค่าเลนจาก Manager
     [HideInInspector] public List<Transform> waypoints; // จุดทั้งหมดที่ต้องวิ่งผ่าน
 // ... ตัวแปรต่างๆ ...
-    private int currentWaypointIndex = 0;
+    public int currentWaypointIndex = 0;
 
     // 🟢 สร้างฟังก์ชันนี้เพิ่ม เพื่อล้างค่าให้รถเหมือนเพิ่งออกจากโรงงาน 🟢
     public void ResetVehicle()
@@ -22,7 +22,7 @@ public class VehicleMovement : MonoBehaviour
     public float acceleration = 2f;
     public float turnSpeed = 5f; // ความไวในการเลี้ยวพวงมาลัย
     public float stopDistance = 1.5f; // ระยะที่ถือว่าขับมาถึงจุด Waypoint แล้ว
-
+    public LayerMask obstacleLayer;
     void Start()
     {
         currentSpeed = targetSpeed;
@@ -55,8 +55,8 @@ public class VehicleMovement : MonoBehaviour
         }
 
         // 4. ระบบ Raycast เบรกกันชน (เหมือนเดิม)
-        Vector3 rayOrigin = transform.position + (Vector3.up * 0.5f);
-        if (Physics.Raycast(rayOrigin, transform.forward, out RaycastHit hit, safeDistance))
+        Vector3 rayOrigin = transform.position + (Vector3.up * 0.5f) + (transform.forward * 1.5f);
+        if (Physics.Raycast(rayOrigin, transform.forward, out RaycastHit hit, safeDistance, obstacleLayer))
         {
             currentSpeed = Mathf.Lerp(currentSpeed, 0f, Time.deltaTime * acceleration * 2f);
         }

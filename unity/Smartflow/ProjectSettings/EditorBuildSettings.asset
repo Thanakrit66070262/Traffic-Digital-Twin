@@ -4,5 +4,11 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/Traffic.unity
+    guid: 111a08b1f47fa994a9cc97e193ec2118
+  - enabled: 1
+    path: Assets/Scenes/Parking.unity
+    guid: b5350e6ed8adf9f449b9fa0d660d5307
   m_configObjects: {}
