@@ -80,7 +80,7 @@ public class SimpleFly : MonoBehaviour
         }
         
         // คลิ๊กซ้ายที่จอเพื่อล็อกเมาส์กลับไปบินต่อ
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(1))
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
