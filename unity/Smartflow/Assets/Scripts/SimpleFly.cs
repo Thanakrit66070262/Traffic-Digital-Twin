@@ -26,7 +26,12 @@ public class SimpleFly : MonoBehaviour
 
     void Update()
     {
-        // --- 1. ระบบหันกล้องด้วยเมาส์ (Mouse Look) ---
+        if (Input.GetMouseButton(1))
+        {
+            // ซ่อนและล็อกเมาส์ให้อยู่ตรงกลางจอชั่วคราว เพื่อให้หมุนกล้องได้ลื่นไหลไม่ติดขอบจอ
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            // --- 1. ระบบหันกล้องด้วยเมาส์ (Mouse Look) ---
         float mouseX = Input.GetAxis("Mouse X") * lookSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * lookSensitivity;
 
@@ -38,12 +43,20 @@ public class SimpleFly : MonoBehaviour
 
         // สั่งหมุนกล้อง
         transform.localRotation = Quaternion.Euler(rotationX, rotationY, 0f);
-
+        }
+        else
+        {
+            // เมื่อปล่อยคลิกขวา ให้แสดงเมาส์และปลดล็อกทันทีเพื่อนำไปชี้ UI ได้
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        
+        
         // --- 2. ระบบเคลื่อนที่ (Movement) ---
         float x = Input.GetAxis("Horizontal");
         float z = Input.GetAxis("Vertical");
         float y = 0f;
-
+        
         if (Input.GetKey(KeyCode.Space)) 
         {
             y = 1f; // บินขึ้น
@@ -67,7 +80,7 @@ public class SimpleFly : MonoBehaviour
         }
         
         // คลิ๊กซ้ายที่จอเพื่อล็อกเมาส์กลับไปบินต่อ
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(1))
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;

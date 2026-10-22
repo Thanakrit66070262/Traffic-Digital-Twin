@@ -48,9 +48,29 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -8646423839389231698, guid: 5491d3a61119bac4eadadbcdbce4e3fe, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -8336024311089090942, guid: 5491d3a61119bac4eadadbcdbce4e3fe, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -5314472977214042217, guid: 5491d3a61119bac4eadadbcdbce4e3fe, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 5491d3a61119bac4eadadbcdbce4e3fe, type: 3}
       propertyPath: m_Name
       value: Nissan Silvia S15
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 5491d3a61119bac4eadadbcdbce4e3fe, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 4409771485646805655, guid: 5491d3a61119bac4eadadbcdbce4e3fe, type: 3}
+      propertyPath: m_Layer
+      value: 6
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -83,10 +103,14 @@ MonoBehaviour:
   targetSpeed: 0
   laneOffset: 0
   waypoints: []
+  currentWaypointIndex: 0
   safeDistance: 5
   acceleration: 2
   turnSpeed: 5
   stopDistance: 1.5
+  obstacleLayer:
+    serializedVersion: 2
+    m_Bits: 0
 --- !u!65 &-6742576916898684733
 BoxCollider:
   m_ObjectHideFlags: 0

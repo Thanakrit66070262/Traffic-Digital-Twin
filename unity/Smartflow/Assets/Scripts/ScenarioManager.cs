@@ -1,7 +1,9 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using Random = UnityEngine.Random;
 
 public class ScenarioManager : MonoBehaviour
 {
@@ -11,35 +13,50 @@ public class ScenarioManager : MonoBehaviour
     public class ScenarioConfig
     {
         public string scenarioName;
-        public float minSpeed;
-        public float maxSpeed;
-
+        // ไม่ได้ใช้ minSpeed/maxSpeed ตรงนี้แล้ว
         [Header("Lane Settings")]
         public float[] laneOffsets = { 0f };
     }
 
     [Header("UI References")]
-    public TMP_Dropdown scenarioDropdown;
     public TMP_Text avgSpeedText;
-
-    // UI สำหรับนับจำนวนรถ
     public TMP_Text inboundCountText;
     public TMP_Text outboundCountText;
+    public TMP_Text trafficStatusText; 
+    public TMP_Text environmentDataText; 
+    public TMP_Text connectionStatusText; 
+    public TMP_Text timestampText;
 
-    // 🟢 ตัวแปรนับแยกประเภทรถทั้ง 4 แบบ (ขาเข้า)
+    // ===============================================
+    // 🟢 1. แยกตัวแปรจำกัดความเร็วสำหรับ Inbound และ Outbound 🟢
+    // ===============================================
+    [Header("Inbound Speed Settings")]
+    public float inboundMinSpeed = 40f;
+    public float inboundMaxSpeed = 80f;
+
+    [Header("Outbound Speed Settings")]
+    public float outboundMinSpeed = 40f;
+    public float outboundMaxSpeed = 80f;
+
+    public float[] globalLaneOffsets = { -3.5f, 0f, 3.5f };
+
+    // ตัวแปรนับแยกประเภทรถ (ขาเข้า)
     private int inboundCarCount = 0;
     private int inboundMotoCount = 0;
     private int inboundTruckCount = 0;
     private int inboundBusCount = 0;
 
-    // 🟢 ตัวแปรนับแยกประเภทรถทั้ง 4 แบบ (ขาออก)
+    // ตัวแปรนับแยกประเภทรถ (ขาออก)
     private int outboundCarCount = 0;
     private int outboundMotoCount = 0;
     private int outboundTruckCount = 0;
     private int outboundBusCount = 0;
 
+    // ตัวแปรสำหรับเก็บข้อมูลจราจรจาก Server
+    private string currentInboundState = "normal";
+    private string currentOutboundState = "normal";
+
     [Header("Vehicle Prefabs & Spawn")]
-    // 🟢 เพิ่มกล่องใส่ Prefab สำหรับรถ 4 ประเภท
     public GameObject[] motorcyclePrefabs;
     public GameObject[] carPrefabs;
     public GameObject[] truckPrefabs;
@@ -67,52 +84,156 @@ public class ScenarioManager : MonoBehaviour
 
     void Start()
     {
-        SetupDropdown();
-        ChangeScenario(0);
+        UpdateDashboardUI();
         StartCoroutine(ProcessNetworkSpawnQueue());
     }
 
-    void SetupDropdown()
+    public int GetInboundTotal() => inboundCarCount + inboundMotoCount + inboundTruckCount + inboundBusCount;
+    public int GetOutboundTotal() => outboundCarCount + outboundMotoCount + outboundTruckCount + outboundBusCount;
+    
+    public void UpdateConnectionStatus(bool isConnected)
     {
-        scenarioDropdown.ClearOptions();
-        List<string> options = new List<string>();
-        foreach (var s in scenarios)
+        if (connectionStatusText != null)
         {
-            options.Add(s.scenarioName);
-        }
-        scenarioDropdown.AddOptions(options);
-        scenarioDropdown.onValueChanged.AddListener(ChangeScenario);
-    }
-
-    public void ChangeScenario(int index)
-    {
-        ScenarioConfig selectedConfig = scenarios[index];
-        float avgSpeed = (selectedConfig.minSpeed + selectedConfig.maxSpeed) / 2f;
-        avgSpeedText.text = $"Avg Speed: {avgSpeed:F1} km/h";
-
-        ClearOldVehicles();
-    }
-
-    // 🟢 อัปเดต UI ให้แสดงผลแยกประเภท 4 แบบ
-    private void UpdateVehicleCountUI()
-    {
-        if (inboundCountText != null)
-        {
-            int totalIn = inboundCarCount + inboundMotoCount + inboundTruckCount + inboundBusCount;
-            // ใช้ \n เพื่อขึ้นบรรทัดใหม่ จะได้ไม่ล้นขอบจอ
-            inboundCountText.text = $"Inbound: {totalIn}\n(Car:{inboundCarCount} Moto:{inboundMotoCount} Truck:{inboundTruckCount} Bus:{inboundBusCount})";
-        }
-
-        if (outboundCountText != null)
-        {
-            int totalOut = outboundCarCount + outboundMotoCount + outboundTruckCount + outboundBusCount;
-            outboundCountText.text = $"Outbound: {totalOut}\n(Car:{outboundCarCount} Moto:{outboundMotoCount} Truck:{outboundTruckCount} Bus:{outboundBusCount})";
+            if (isConnected)
+                connectionStatusText.text = "LIVE CONNECTION STATUS: <color=#06D6A0> ACTIVE</color>";
+            else
+                connectionStatusText.text = "LIVE CONNECTION STATUS: <color=#FF4C4C> DISCONNECTED</color>";
         }
     }
 
     public void SpawnVehicleFromNetwork(SmartFlow.Network.SpawnVehicleData netData)
     {
         networkSpawnQueue.Enqueue(netData);
+
+        if (timestampText != null && !string.IsNullOrEmpty(netData.timestamp))
+        {
+            if (DateTime.TryParse(netData.timestamp, out DateTime parsedDate))
+            {
+                string readableTime = parsedDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss");
+                timestampText.text = $"LIVE FEED: {readableTime}";
+            }
+            else
+            {
+                timestampText.text = $"LIVE FEED: {netData.timestamp}";
+            }
+        }
+    }
+
+    // =========================================================================
+    // 🟢 2. ปรับปรุงการคำนวณความเร็วแยกเลนจากข้อมูล @in และ @out 🟢
+    // =========================================================================
+    public void UpdateTrafficState(SmartFlow.Network.TrafficStatePayload payload)
+    {
+        if (payload == null) return;
+        
+        if (payload.zones != null)
+        {
+            currentInboundState = payload.zones.@in.trafficState != null ? payload.zones.@in.trafficState.ToLower() : "normal";
+            currentOutboundState = payload.zones.@out.trafficState != null ? payload.zones.@out.trafficState.ToLower() : "normal";
+
+            // --- กำหนดค่า Min/Max (เหมือนเดิม) ---
+            if (currentInboundState == "standstill" || currentInboundState == "high_density") 
+            { inboundMinSpeed = 10f; inboundMaxSpeed = 20f; } 
+            else if (currentInboundState == "slow_moving") 
+            { inboundMinSpeed = 25f; inboundMaxSpeed = 40f; } 
+            else 
+            { inboundMinSpeed = 40f; inboundMaxSpeed = 70f; }
+
+            if (currentOutboundState == "standstill" || currentOutboundState == "high_density") 
+            { outboundMinSpeed = 10f; outboundMaxSpeed = 20f; } 
+            else if (currentOutboundState == "slow_moving") 
+            { outboundMinSpeed = 25f; outboundMaxSpeed = 40f; } 
+            else 
+            { outboundMinSpeed = 40f; outboundMaxSpeed = 70f; }
+        }
+
+        UpdateDashboardUI();
+        
+        // =======================================================
+        // 🟢 สั่งรันคลื่นจราจร (Wave) เปลี่ยนความเร็วรถเก่าแบบไล่ระดับ
+        // =======================================================
+        if (inboundRoute != null)
+            StartCoroutine(ApplySpeedGradientWave(inboundRoute, inboundMinSpeed, inboundMaxSpeed));
+            
+        if (outboundRoute != null)
+            StartCoroutine(ApplySpeedGradientWave(outboundRoute, outboundMinSpeed, outboundMaxSpeed));
+        
+        Debug.Log($"[Traffic Speed Updated] Inbound: {inboundMinSpeed}-{inboundMaxSpeed} km/h | Outbound: {outboundMinSpeed}-{outboundMaxSpeed} km/h");
+    }
+    private System.Collections.IEnumerator ApplySpeedGradientWave(WaypointRoute route, float minSpeed, float maxSpeed)
+    {
+        List<VehicleMovement> vehiclesInLane = new List<VehicleMovement>();
+        
+        foreach (GameObject vehicle in activeVehicles)
+        {
+            if (!vehicle.activeInHierarchy) continue;
+            
+            VehicleMovement vScript = vehicle.GetComponent<VehicleMovement>();
+            // เช็กว่ารถคันนี้กำลังวิ่งบนเส้นทาง (waypoints) ที่ส่งเข้ามาหรือไม่
+            if (vScript != null && vScript.waypoints == route.waypoints)
+            {
+                vehiclesInLane.Add(vScript);
+            }
+        }
+
+        // เรียงลำดับรถจาก Waypoint ไกลสุด (ปลายทาง) ย้อนกลับมาหาต้นทาง
+        vehiclesInLane.Sort((a, b) => b.currentWaypointIndex.CompareTo(a.currentWaypointIndex));
+
+        // ทยอยอัปเดตความเร็วทีละคันแบบไล่ระดับเวลา
+        foreach (VehicleMovement vScript in vehiclesInLane)
+        {
+            vScript.targetSpeed = UnityEngine.Random.Range(minSpeed, maxSpeed);
+            
+            // หน่วงเวลา 0.15 วินาทีก่อนส่งสัญญาณเบรก/เร่งให้รถคันถัดไปที่อยู่ด้านหลัง
+            yield return new UnityEngine.WaitForSeconds(0.15f); 
+        }
+    }
+
+    private void UpdateDashboardUI()
+    {
+        
+        // 1. อัปเดตตัวเลข Inbound
+        if (inboundCountText != null) 
+        {
+            int totalIn = inboundCarCount + inboundMotoCount + inboundTruckCount + inboundBusCount;
+            inboundCountText.text = $"INBOUND: {totalIn}\n<size=70%>Car:{inboundCarCount} Moto:{inboundMotoCount} Truck:{inboundTruckCount} Bus:{inboundBusCount}</size>";
+        }
+        
+        // 2. อัปเดตตัวเลข Outbound
+        if (outboundCountText != null) 
+        {
+            int totalOut = outboundCarCount + outboundMotoCount + outboundTruckCount + outboundBusCount;
+            outboundCountText.text = $"OUTBOUND: {totalOut}\n<size=70%>Car:{outboundCarCount} Moto:{outboundMotoCount} Truck:{outboundTruckCount} Bus:{outboundBusCount}</size>";
+        }
+
+        // 3. 🟢 ประเมินสถานะแยกฝั่ง IN-OUT ตามคำตัดสินจาก Server โดยตรง
+        if (trafficStatusText != null)
+        {
+            // สร้างฟังก์ชันช่วยแปลงข้อความสถานะเป็นสี จะได้ไม่ต้องเขียน if-else ซ้ำสองรอบ
+            string GetColoredStatus(string state)
+            {
+                if (state == "standstill" || state == "high_density") 
+                    return "<color=#FF4C4C>HIGH DENSITY</color>"; // สีแดง
+                else if (state == "slow_moving") 
+                    return "<color=#FFD166>SLOW MOVING</color>"; // สีเหลือง
+                else 
+                    return "<color=#06D6A0>NORMAL</color>"; // สีเขียว
+            }
+
+            // แปลงสถานะที่เซิร์ฟเวอร์ส่งมาให้กลายเป็นข้อความพร้อมโค้ดสี
+            string inStatus = GetColoredStatus(currentInboundState);
+            string outStatus = GetColoredStatus(currentOutboundState);
+
+            // แสดงผลใน Text เดียวแบบขึ้นบรรทัดใหม่
+            trafficStatusText.text = $"TRAFFIC STATUS\nIN: {inStatus} | OUT: {outStatus}";
+        }
+
+        // 4. อัปเดตข้อมูลสิ่งแวดล้อม
+        if (environmentDataText != null)
+        {
+            environmentDataText.text = "PM 2.5: <color=#FFD166>45 µg/m³</color> | WIND: 12 km/h";
+        }
     }
 
     private IEnumerator ProcessNetworkSpawnQueue()
@@ -128,7 +249,6 @@ public class ScenarioManager : MonoBehaviour
 
                 WaypointRoute selectedRoute = null;
 
-                // 1. เช็กทิศทางวิ่ง
                 if (dir == "in" || dir == "inbound") selectedRoute = inboundRoute;
                 else if (dir == "out" || dir == "outbound") selectedRoute = outboundRoute;
                 else
@@ -139,7 +259,6 @@ public class ScenarioManager : MonoBehaviour
 
                 if (selectedRoute == null || selectedRoute.waypoints.Count == 0) continue;
 
-                // 2. 🟢 จัดการการนับเลข และเลือกกลุ่ม Prefab ให้ตรงตาม Type
                 GameObject[] selectedPrefabArray = null;
 
                 if (vType == "motorcycle" || vType == "moto")
@@ -159,45 +278,83 @@ public class ScenarioManager : MonoBehaviour
                 }
                 else
                 {
-                    // กรณีเป็น "car" หรือคำแปลกๆ ที่ไม่รู้จัก จะปัดตกเป็นรถยนต์ทั้งหมด
                     selectedPrefabArray = carPrefabs;
                     if (selectedRoute == inboundRoute) inboundCarCount++; else outboundCarCount++;
                 }
 
-                // อัปเดต UI ทันที
-                UpdateVehicleCountUI();
+                UpdateDashboardUI();
 
-                // ป้องกัน Error ถ้าใน Unity ไม่ได้ลาก Prefab มาใส่ใน Array
                 if (selectedPrefabArray == null || selectedPrefabArray.Length == 0)
                 {
                     Debug.LogWarning($"⚠️ ไม่มี Prefab สำหรับรถประเภท: {vType} กรุณาใส่ Prefab ใน Inspector");
-                    continue; // ข้ามการสร้างรถคันนี้ไปเลยถ้าไม่มีโมเดล
+                    continue; 
                 }
-
-                // 3. สุ่มเลือกรถ 1 คัน จาก Array ที่เราเลือกไว้
+                
                 GameObject prefabToSpawn = selectedPrefabArray[Random.Range(0, selectedPrefabArray.Length)];
-
-                // จัดการเลน
-                ScenarioConfig currentConfig = scenarios[scenarioDropdown.value];
-                float randomLaneOffset = currentConfig.laneOffsets[Random.Range(0, currentConfig.laneOffsets.Length)];
-
+                float randomLaneOffset = globalLaneOffsets[Random.Range(0, globalLaneOffsets.Length)];
                 Transform startPoint = selectedRoute.waypoints[0];
                 Vector3 finalSpawnPosition = startPoint.position + (startPoint.right * randomLaneOffset);
 
-                // เบิกรถจาก Pool
-                GameObject newVehicle = GetVehicleFromPool(prefabToSpawn);
+                // =========================================================================
+                // 🟢 4. ระบบเช็กพื้นที่ว่างก่อนเสก (Spawn Clearance Check) ป้องกันรถทับกัน
+                // =========================================================================
+                bool isSpawnAreaClear = false;
+                while (!isSpawnAreaClear)
+                {
+                    // เช็กรัศมี 4 เมตร ว่ามีวัตถุอะไรขวางจุดเกิดหรือไม่ (ปรับตัวเลข 4f ได้ตามความยาวรถ)
+                    Collider[] hitColliders = Physics.OverlapSphere(finalSpawnPosition, 4f);
+                    bool foundVehicle = false;
 
+                    foreach (var hit in hitColliders)
+                    {
+                        // ถ้าวัตถุนั้นมีสคริปต์ VehicleMovement แปะอยู่ แปลว่าเป็นรถคันอื่น
+                        if (hit.transform.root.GetComponent<VehicleMovement>() != null)
+                        {
+                            foundVehicle = true;
+                            break; // เจอคันเดียวก็ถือว่าไม่ว่างแล้ว
+                        }
+                    }
+
+                    if (foundVehicle)
+                    {
+                        // ถ้ามีรถขวางอยู่ ให้รอ 0.5 วินาที แล้วกลับไปเช็กพื้นที่ใหม่
+                        yield return new WaitForSeconds(0.5f);
+                    }
+                    else
+                    {
+                        // พื้นที่โล่งแล้ว ทะลุลูปไปเสกรถได้เลย
+                        isSpawnAreaClear = true;
+                    }
+                }
+                // =========================================================================
+
+                // เบิกรถจาก Pool (จะทำงานก็ต่อเมื่อ isSpawnAreaClear เป็น true แล้วเท่านั้น)
+                GameObject newVehicle = GetVehicleFromPool(prefabToSpawn);
                 newVehicle.transform.position = finalSpawnPosition;
                 newVehicle.transform.rotation = startPoint.rotation;
 
                 VehicleMovement vehicleScript = newVehicle.GetComponent<VehicleMovement>();
-                vehicleScript.targetSpeed = Random.Range(currentConfig.minSpeed, currentConfig.maxSpeed);
+                
+                // =================================================================
+                // 🟢 3. จ่ายความเร็วให้รถตามเส้นทางที่รถคันนั้นกำลังวิ่ง 🟢
+                // =================================================================
+                float assignedTargetSpeed = 40f;
+                if (selectedRoute == inboundRoute)
+                {
+                    assignedTargetSpeed = Random.Range(inboundMinSpeed, inboundMaxSpeed);
+                }
+                else
+                {
+                    assignedTargetSpeed = Random.Range(outboundMinSpeed, outboundMaxSpeed);
+                }
+
+                vehicleScript.targetSpeed = assignedTargetSpeed;
                 vehicleScript.laneOffset = randomLaneOffset;
                 vehicleScript.waypoints = selectedRoute.waypoints;
 
                 vehicleScript.ResetVehicle();
 
-                Debug.Log($"🚗 Spawn รถสำเร็จ: {netData.type} ฝั่ง {netData.direction} (TrackID: {netData.trackId})");
+                Debug.Log($"🚗 Spawn รถสำเร็จ: {netData.type} ฝั่ง {netData.direction} (Speed: {assignedTargetSpeed:F1} km/h)");
 
                 yield return new WaitForSeconds(networkSpawnDelay);
             }
@@ -241,14 +398,7 @@ public class ScenarioManager : MonoBehaviour
         GameObject originalPrefab = vehicle.GetComponent<PoolMember>().originalPrefab;
         vehiclePools[originalPrefab].Enqueue(vehicle);
     }
-
-    void ClearOldVehicles()
-    {
-        for (int i = activeVehicles.Count - 1; i >= 0; i--)
-        {
-            ReturnVehicleToPool(activeVehicles[i]);
-        }
-    }
+    
 }
 
 public class PoolMember : MonoBehaviour

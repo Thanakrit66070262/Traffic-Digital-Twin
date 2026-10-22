@@ -48,9 +48,29 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -6202290837828241010, guid: 1556c59c710b0e9408160e91aa339766, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: -5395992468317945262, guid: 1556c59c710b0e9408160e91aa339766, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 1556c59c710b0e9408160e91aa339766, type: 3}
       propertyPath: m_Name
       value: vario
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 1556c59c710b0e9408160e91aa339766, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 2456994330929454298, guid: 1556c59c710b0e9408160e91aa339766, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 6785332893527082997, guid: 1556c59c710b0e9408160e91aa339766, type: 3}
+      propertyPath: m_Layer
+      value: 6
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -87,6 +107,9 @@ MonoBehaviour:
   acceleration: 2
   turnSpeed: 5
   stopDistance: 1.5
+  obstacleLayer:
+    serializedVersion: 2
+    m_Bits: 64
 --- !u!65 &-4976391043880405637
 BoxCollider:
   m_ObjectHideFlags: 0
