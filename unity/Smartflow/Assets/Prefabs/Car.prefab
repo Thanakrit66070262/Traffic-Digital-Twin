@@ -129,13 +129,14 @@ MonoBehaviour:
   targetSpeed: 0
   laneOffset: 0
   waypoints: []
-  safeDistance: 5
-  acceleration: 2
-  turnSpeed: 5
+  currentWaypointIndex: 0
+  safeDistance: 3
+  acceleration: 3
+  turnSpeed: 6
   stopDistance: 1.5
   obstacleLayer:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 0
 --- !u!1001 &3636529515140751513
 PrefabInstance:
   m_ObjectHideFlags: 0

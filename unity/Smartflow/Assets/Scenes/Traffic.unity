@@ -980,7 +980,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Load Traffic Scene
+  m_text: Load Parking Scene
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -4029,7 +4029,7 @@ MonoBehaviour:
   - {fileID: 4495166478373131178, guid: b257922b9b58dfd4ba87faf1d5969bc5, type: 3}
   - {fileID: 4495166478373131178, guid: d3c8bd221ec02b048a20255a247daf6b, type: 3}
   truckPrefabs:
-  - {fileID: 2759268469964745936, guid: fbf24acdf7be9db4b9ebd21562a660f7, type: 3}
+  - {fileID: 5148103231927336784, guid: b01440fab3494b6488acf26a636286e3, type: 3}
   busPrefabs:
   - {fileID: 7605343255231519006, guid: 3dddaa70dea14b342806d16778fbd403, type: 3}
   inboundRoute: {fileID: 658359328}

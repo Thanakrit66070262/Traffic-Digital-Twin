@@ -107,13 +107,14 @@ MonoBehaviour:
   targetSpeed: 0
   laneOffset: 0
   waypoints: []
-  safeDistance: 5
+  currentWaypointIndex: 0
+  safeDistance: 3
   acceleration: 2
   turnSpeed: 5
   stopDistance: 1.5
   obstacleLayer:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 0
 --- !u!65 &-6742576916898684733
 BoxCollider:
   m_ObjectHideFlags: 0

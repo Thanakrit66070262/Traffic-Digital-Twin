@@ -130,10 +130,10 @@ MonoBehaviour:
   laneOffset: 0
   waypoints: []
   currentWaypointIndex: 0
-  safeDistance: 5
-  acceleration: 2
-  turnSpeed: 5
-  stopDistance: 1.5
+  safeDistance: 7
+  acceleration: 1.5
+  turnSpeed: 3.5
+  stopDistance: 3.5
   obstacleLayer:
     serializedVersion: 2
     m_Bits: 0

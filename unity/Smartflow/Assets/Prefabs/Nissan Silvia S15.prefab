@@ -56,6 +56,10 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 6
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 5491d3a61119bac4eadadbcdbce4e3fe, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: daafc34565aca074e8c80e1049b78d56, type: 2}
     - target: {fileID: -5314472977214042217, guid: 5491d3a61119bac4eadadbcdbce4e3fe, type: 3}
       propertyPath: m_Layer
       value: 6
@@ -104,9 +108,9 @@ MonoBehaviour:
   laneOffset: 0
   waypoints: []
   currentWaypointIndex: 0
-  safeDistance: 5
-  acceleration: 2
-  turnSpeed: 5
+  safeDistance: 3
+  acceleration: 3
+  turnSpeed: 6
   stopDistance: 1.5
   obstacleLayer:
     serializedVersion: 2
