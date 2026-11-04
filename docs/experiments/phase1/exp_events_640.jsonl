@@ -1,0 +1,5 @@
+{"schema": "spawn-event/0.2-draft", "timestamp": "2026-11-04T08:50:56.155Z", "cameraId": "cam-chalongkrung-01", "videoTimeSec": 4.28, "frameCount": 107, "trackId": "car-0012", "type": "car", "direction": "in", "confidence": 0.721}
+{"schema": "spawn-event/0.2-draft", "timestamp": "2026-11-04T08:50:57.236Z", "cameraId": "cam-chalongkrung-01", "videoTimeSec": 6.2, "frameCount": 155, "trackId": "car-0005", "type": "car", "direction": "in", "confidence": 0.86}
+{"schema": "spawn-event/0.2-draft", "timestamp": "2026-11-04T08:50:57.896Z", "cameraId": "cam-chalongkrung-01", "videoTimeSec": 7.36, "frameCount": 184, "trackId": "car-0014", "type": "car", "direction": "in", "confidence": 0.723}
+{"schema": "spawn-event/0.2-draft", "timestamp": "2026-11-04T08:51:02.490Z", "cameraId": "cam-chalongkrung-01", "videoTimeSec": 15.64, "frameCount": 391, "trackId": "car-0103", "type": "car", "direction": "in", "confidence": 0.418}
+{"schema": "spawn-event/0.2-draft", "timestamp": "2026-11-04T08:51:05.052Z", "cameraId": "cam-chalongkrung-01", "videoTimeSec": 20.44, "frameCount": 511, "trackId": "car-0013", "type": "car", "direction": "in", "confidence": 0.632}
