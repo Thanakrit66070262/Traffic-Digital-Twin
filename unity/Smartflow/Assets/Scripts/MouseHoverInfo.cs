@@ -1,55 +1,57 @@
-using UnityEngine;
+using SmartFlow.Network;
+using SmartFlow.Traffic;
+using SmartFlow.UI;
 using TMPro;
+using UnityEngine;
 
 public class MouseHoverInfo : MonoBehaviour
 {
+    private const string MUTED_HEX = "#8A94A6";
+    // สีทิศใช้ cyan กลางๆ — เดิมใช้เขียว/เหลืองซึ่งชนกับสีสถานะ NORMAL/SLOW
+    private const string DIRECTION_HEX = "#00E5FF";
+    private const string NO_VALUE = "—";
+
+    // ขยับเยื้องขวาล่างจากเมาส์ เพื่อไม่ให้บังลูกศร
+    private static readonly Vector3 TooltipOffset = new Vector3(20f, -20f, 0f);
+
     [Header("UI References")]
     public RectTransform tooltipPanel; // ลาก UI Panel มาใส่
     public TMP_Text tooltipText;       // ลาก UI Text มาใส่
 
     void Update()
     {
-        // 1. ถ้าซ่อนเมาส์อยู่ (โหมดบิน) ไม่ต้องแสดง Tooltip
-        if (Cursor.lockState == CursorLockMode.Locked) 
+        if (tooltipPanel == null || tooltipText == null) return;
+
+        RoadInfo road = RoadPicker.PickUnderMouse();
+        ScenarioManager manager = ScenarioManager.Instance;
+        if (road == null || manager == null)
         {
             tooltipPanel.gameObject.SetActive(false);
             return;
         }
 
-        // 2. ยิงเรย์แคสต์จากตำแหน่งเมาส์บนจอ พุ่งเข้าไปในโลก 3 มิติ
-        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        RaycastHit hit;
+        tooltipPanel.gameObject.SetActive(true);
+        tooltipPanel.position = Input.mousePosition + TooltipOffset;
+        tooltipText.text = BuildTooltip(road, manager);
+    }
 
-        if (Physics.Raycast(ray, out hit, 1000f))
-        {
-            // 3. เช็กว่าสิ่งที่ชน มีสคริปต์ RoadInfo แปะอยู่หรือไม่
-            RoadInfo road = hit.collider.GetComponent<RoadInfo>();
-            
-            if (road != null)
-            {
-                // เปิดการแสดงผล Tooltip
-                tooltipPanel.gameObject.SetActive(true);
-                
-                // ให้กรอบ UI ลอยตามตำแหน่งเมาส์ (ขยับเยื้องขวาล่างนิดหน่อยเพื่อไม่ให้บังลูกศร)
-                tooltipPanel.position = Input.mousePosition + new Vector3(20, -20, 0); 
+    private static string BuildTooltip(RoadInfo road, ScenarioManager manager)
+    {
+        TrafficDirection direction = RoadPicker.ToDirection(road);
+        string directionLabel = direction == TrafficDirection.Inbound ? "INBOUND" : "OUTBOUND";
+        int total = manager.GetCumulativeCounts(direction).Total;
 
-                // ดึงข้อมูลจำนวนรถจาก ScenarioManager
-                int vehicleCount = road.isInbound ? ScenarioManager.Instance.GetInboundTotal() : ScenarioManager.Instance.GetOutboundTotal();
-                string directionStr = road.isInbound ? "<color=#06D6A0>INBOUND</color>" : "<color=#FFD166>OUTBOUND</color>";
+        string header = $"<b>{road.roadName}</b>\n" +
+                        $"<color={DIRECTION_HEX}>{directionLabel}</color>   {total} <color={MUTED_HEX}>vehicles (total)</color>";
 
-                // อัปเดตข้อความ
-                tooltipText.text = $"<b>{road.roadName}</b>\nDIRECTION: {directionStr}\nTOTAL VEHICLES: {vehicleCount}";
-            }
-            else
-            {
-                // ถ้าชี้โดนอย่างอื่น (เช่น ตึก รถ) ให้ซ่อน Tooltip
-                tooltipPanel.gameObject.SetActive(false);
-            }
-        }
-        else
-        {
-            // ถ้าชี้โดนความว่างเปล่า ให้ซ่อน Tooltip
-            tooltipPanel.gameObject.SetActive(false);
-        }
+        ZoneDetail zone = manager.LatestTrafficState.GetZone(direction);
+        if (zone == null)
+            return $"{header}\n<color={MUTED_HEX}>STATUS</color>   {NO_VALUE}";
+
+        string status = TrafficStatusStyle.ToRichText(TrafficLevelParser.Parse(zone.trafficState));
+        return $"{header}\n" +
+               $"<color={MUTED_HEX}>STATUS</color>   {status}\n" +
+               $"<color={MUTED_HEX}>OCCUPANCY</color>   {zone.occupancy:F1} veh\n" +
+               $"<color={MUTED_HEX}>FLOW</color>   {zone.vehicleFlowRate:F1} veh/min   <color={MUTED_HEX}>MOTO</color> {zone.motorcycleFlowRate:F1}/min";
     }
 }

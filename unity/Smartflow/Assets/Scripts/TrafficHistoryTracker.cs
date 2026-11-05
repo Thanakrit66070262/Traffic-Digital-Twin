@@ -1,23 +1,24 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using SmartFlow.Traffic;
 using UnityEngine;
 
 public class TrafficHistoryTracker : MonoBehaviour
 {
     public static TrafficHistoryTracker Instance;
 
-    [System.Serializable]
+    [Serializable]
     public struct TrafficDataPoint
     {
-        public int statusValue; // 1 = NORMAL, 2 = SLOW MOVING, 3 = HEAVY
-        public string statusName;
+        public int inboundValue;  // ค่า (int)TrafficLevel: 1 = NORMAL, 2 = SLOW MOVING, 3 = HIGH DENSITY
+        public int outboundValue;
         public string timestamp;
 
-        public TrafficDataPoint(int value, string name, string time)
+        public TrafficDataPoint(int inbound, int outbound, string time)
         {
-            statusValue = value;
-            statusName = name;
+            inboundValue = inbound;
+            outboundValue = outbound;
             timestamp = time;
         }
     }
@@ -27,22 +28,22 @@ public class TrafficHistoryTracker : MonoBehaviour
     public int maxDataPoints = 7;      // เก็บ 7 จุด (-120s ถึง NOW)
 
     // คิวเก็บข้อมูลแบบ Sliding Window
-    private List<TrafficDataPoint> historyQueue = new List<TrafficDataPoint>();
+    private readonly List<TrafficDataPoint> historyQueue = new List<TrafficDataPoint>();
+
+    // ช่วงเวลาทั้งหมดที่กราฟครอบคลุม ใช้ทำ label แกน X
+    public float WindowSeconds => sampleInterval * Mathf.Max(maxDataPoints - 1, 1);
 
     void Awake()
     {
         Instance = this;
     }
 
-        void Start()
+    void Start()
     {
-        // 🟢 สั่งบันทึกข้อมูลจุดแรกทันทีที่กด Play (ไม่ต้องรอ 20 วินาทีแรก)
-        RecordDataPoint(); 
-
-        // เริ่มลูปนับเวลา 20 วินาทีสำหรับจุดถัดๆ ไป
         StartCoroutine(SampleTrafficStateRoutine());
     }
 
+    // บันทึกทันทีตอนเริ่ม แล้วค่อยรอรอบถัดไป (เดิม Start บันทึกเองอีกครั้งด้วย ทำให้จุดแรกซ้ำ)
     private IEnumerator SampleTrafficStateRoutine()
     {
         while (true)
@@ -54,44 +55,26 @@ public class TrafficHistoryTracker : MonoBehaviour
 
     private void RecordDataPoint()
     {
-        if (ScenarioManager.Instance == null) return;
+        ScenarioManager manager = ScenarioManager.Instance;
+        if (manager == null)
+        {
+            Debug.LogWarning("[TrafficHistoryTracker] ScenarioManager.Instance not found; skipping sample.");
+            return;
+        }
 
-        // 1. อ่านสถานะการจราจรจาก ScenarioManager
-        string currentState = ScenarioManager.Instance.GetDominantTrafficState();
-        int value = MapStateToValue(currentState);
-        string timeStr = DateTime.Now.ToString("HH:mm:ss");
+        int inbound = (int)TrafficLevelParser.Parse(manager.GetLaneState(TrafficDirection.Inbound));
+        int outbound = (int)TrafficLevelParser.Parse(manager.GetLaneState(TrafficDirection.Outbound));
+        historyQueue.Add(new TrafficDataPoint(inbound, outbound, DateTime.Now.ToString("HH:mm:ss")));
 
-        // 2. สร้างก้อนข้อมูลจุดใหม่
-        TrafficDataPoint newPoint = new TrafficDataPoint(value, currentState.ToUpper(), timeStr);
-
-        // 3. เพิ่มเข้าคิวประวัติ
-        historyQueue.Add(newPoint);
-
-        // 4. ถ้าเกิน 7 จุด ให้ลบจุดเก่าสุด (จุดแรก) ออกแบบ FIFO
+        // เกินจำนวนจุดสูงสุด ให้ลบจุดเก่าสุดออก (FIFO)
         if (historyQueue.Count > maxDataPoints)
         {
             historyQueue.RemoveAt(0);
         }
 
-        // 5. แจ้งระบบ UI ให้วาดกราฟใหม่
-        OnHistoryUpdated();
-    }
-
-    private int MapStateToValue(string state)
-    {
-        switch (state.ToLower())
+        if (TrafficGraphUIToolkit.Instance != null)
         {
-            case "standstill":
-            case "high_density":
-            case "heavy":
-                return 3; // HEAVY (แกน Y สูงสุด)
-
-            case "slow_moving":
-            case "congested":
-                return 2; // SLOW MOVING (แกน Y ปานกลาง)
-
-            default:
-                return 1; // NORMAL (แกน Y ล่างสุด)
+            TrafficGraphUIToolkit.Instance.RefreshGraph();
         }
     }
 
@@ -100,15 +83,4 @@ public class TrafficHistoryTracker : MonoBehaviour
     {
         return historyQueue;
     }
-
-    private void OnHistoryUpdated()
-{
-    Debug.Log($"[TrafficHistoryTracker] Data updated! Total points: {historyQueue.Count}");
-
-    // 🟢 สั่งให้ UI Toolkit สลับคิววาดเส้นกราฟใหม่
-    if (TrafficGraphUIToolkit.Instance != null)
-    {
-        TrafficGraphUIToolkit.Instance.RefreshGraph();
-    }
-}
 }

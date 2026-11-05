@@ -19,9 +19,16 @@ public class SimpleFly : MonoBehaviour
         Cursor.visible = false;
 
         // ดึงองศาปัจจุบันของกล้องมาตั้งเป็นค่าเริ่มต้น
+        SyncFromTransform();
+    }
+
+    // เรียกหลังมี script อื่นเลื่อน/หมุนกล้อง (เช่น CameraDirector) ไม่งั้นตอนคลิกขวาลากครั้งถัดไปกล้องจะดีดกลับมุมเดิม
+    public void SyncFromTransform()
+    {
         Vector3 rot = transform.localRotation.eulerAngles;
         rotationY = rot.y;
-        rotationX = rot.x;
+        // eulerAngles ให้ 0..360 — เงยขึ้น 10° จะได้ 350 ซึ่งถ้าไม่แปลงจะโดน clamp เป็น 90 (หันลงพื้น)
+        rotationX = rot.x > 180f ? rot.x - 360f : rot.x;
     }
 
     void Update()
