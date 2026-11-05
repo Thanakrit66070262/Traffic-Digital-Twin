@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { resetCaptureFiles } from '../capture/payloadCapture';
 import { CAPTURED_CHANNELS } from '../constants';
 import { vehicleCounters } from '../counters/vehicleCounters';
+import { resetLatencyLog } from '../latency/latencyLog';
 
 /**
  * เริ่มรอบเดโมใหม่ — ล้างทั้งไฟล์ capture และตัวนับให้ว่างพร้อมกัน
@@ -16,5 +17,6 @@ import { vehicleCounters } from '../counters/vehicleCounters';
 export function resetSessionHandler(_req: Request, res: Response): void {
   resetCaptureFiles(CAPTURED_CHANNELS);
   vehicleCounters.reset();
+  resetLatencyLog();
   res.json({ ok: true, cleared: [...CAPTURED_CHANNELS, 'stats'] });
 }

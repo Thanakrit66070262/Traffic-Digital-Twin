@@ -26,6 +26,14 @@ from src.constants import DISPLAY_MAX_SIDE, ZERO_COUNT_WARN_FRAMES
 from src.counter import AnomalyEvent, CountEvent, VehicleCounter
 from src.detector import DetectorError, VehicleDetector
 from src.emitter import SpawnEventWriter
+from src.latency_log import (
+    STAGE_CROSSING,
+    STAGE_FRAME_READ,
+    STAGE_POST_START,
+    LatencyLog,
+    now_ms,
+)
+from src.latency_log import is_enabled as latency_log_enabled
 from src.poster import BackendPoster
 from src.traffic_state import WindowAccumulator, window_to_dict
 
@@ -63,6 +71,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--replay-backend",
         action="store_true",
         help="after detection, immediately post to the backend (start the backend first)",
+    )
+    # flag แทน env var ได้ — คำสั่งตั้ง env ต่างกันทุก shell (bash / PowerShell / cmd) พลาดง่าย
+    parser.add_argument(
+        "--latency-log",
+        action="store_true",
+        help="experiment 4: log timestamps to latency_ai.csv (same as LATENCY_LOG=true)",
     )
     return parser.parse_args(argv)
 
@@ -222,6 +236,16 @@ def run(args: argparse.Namespace) -> int:
     )
     events.open()
     poster = BackendPoster(cfg.backend_url) if cfg.send_to_backend else None
+    # การทดลองที่ 4 — ปิดเป็นค่าเริ่มต้น เปิดด้วย LATENCY_LOG=true (ดู src/latency_log.py)
+    latency = LatencyLog(
+        OUT_DIR / "latency_ai.csv", enabled=args.latency_log or latency_log_enabled()
+    )
+    latency.open()
+    if latency.enabled:
+        print(f"[latency] Logging timestamps to {latency.path}")
+        if poster is None:
+            # บันทึกเฉพาะ event ที่ POST จริง — ปิด backend ไว้ = ได้ไฟล์ว่าง ต้องบอกตั้งแต่ต้น
+            print("[latency] WARNING: send_to_backend is off — no timestamps will be recorded")
 
     # วัดความหนาแน่น/อัตราการไหล -> traffic_state.jsonl (ยังไม่ตัดสินสถานะที่นี่
     # การตัดสินอยู่ใน replay.py จะได้จูนเกณฑ์ใหม่โดยไม่ต้องรัน YOLO ซ้ำ)
@@ -241,15 +265,23 @@ def run(args: argparse.Namespace) -> int:
                 ok, frame = cap.read()
                 if not ok:
                     break
+                frame_read_ms = now_ms()
 
                 detections = detector.track(frame)
                 new_counts, new_anomalies = vehicle_counter.update(frame_index, detections)
+                crossing_ms = now_ms()
 
                 for event in new_counts:
                     counts_writer.writerow(_row(event, fps))
                     payload = events.emit(event)
                     if poster is not None:
+                        post_start_ms = now_ms()
                         poster.post(payload)
+                        # เขียนไฟล์หลัง POST — I/O ของการทดลองต้องไม่ไปบวกในเวลาที่วัด
+                        track_id = payload["trackId"]
+                        latency.record(track_id, STAGE_FRAME_READ, frame_read_ms)
+                        latency.record(track_id, STAGE_CROSSING, crossing_ms)
+                        latency.record(track_id, STAGE_POST_START, post_start_ms)
                 for anomaly in new_anomalies:
                     anomalies_writer.writerow([*_row(anomaly, fps), anomaly.reason])
                 if new_counts or new_anomalies:
@@ -314,6 +346,7 @@ def run(args: argparse.Namespace) -> int:
             write_jsonl(state_handle, window_to_dict(last))
             windows_written += 1
         state_handle.close()
+        latency.close()
         if poster is not None:
             poster.close()
 

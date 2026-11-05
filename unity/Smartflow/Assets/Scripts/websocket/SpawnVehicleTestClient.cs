@@ -9,6 +9,9 @@ namespace SmartFlow.Network
     {
         [SerializeField] private string _serverUrl = "http://localhost:3000";
 
+        [Tooltip("การทดลองที่ 4: บันทึก timestamp ลง Logs/latency_unity.csv — ปิดไว้ตอนใช้งานปกติ")]
+        [SerializeField] private bool _logLatency = false;
+
         private SocketIOUnity _socket;
 
         // 🟢 1. สร้างคิวสำหรับเก็บคำสั่งที่จะให้ทำงานบน Main Thread
@@ -17,6 +20,7 @@ namespace SmartFlow.Network
 
         private void Start()
         {
+            if (_logLatency) LatencyLog.Begin();
             Connect();
         }
 
@@ -100,10 +104,15 @@ namespace SmartFlow.Network
 
                 if (envelope?.data == null) return;
 
+                // จับเวลาหลัง parse ก่อนเข้าคิว spawn — นับรวม thread dispatch + JSON parse
+                long receivedMs = LatencyLog.NowMs();
+
                 if (ScenarioManager.Instance != null)
                 {
                     ScenarioManager.Instance.SpawnVehicleFromNetwork(envelope.data);
                 }
+
+                LatencyLog.Record(envelope.data.trackId, LatencyLog.StageReceived, receivedMs);
             });
 
             // ==========================================

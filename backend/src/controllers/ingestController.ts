@@ -3,6 +3,7 @@ import { Server as SocketServer } from 'socket.io';
 import { capture } from '../capture/payloadCapture';
 import { Direction, LOG_TRUNCATE, VehicleType } from '../constants';
 import { vehicleCounters } from '../counters/vehicleCounters';
+import { STAGE_EMIT, STAGE_VALIDATED, recordLatency } from '../latency/latencyLog';
 import { toUnitySpawnPayload } from '../sockets/unityPayload';
 import { SpawnEvent, validateSpawnEvent } from '../validation/validateSpawnEvent';
 
@@ -17,16 +18,20 @@ export function createIngestHandler(io: SocketServer) {
       return;
     }
 
+    const validatedMs = Date.now();
     const event = req.body as SpawnEvent;
     vehicleCounters.record(event.type as VehicleType, event.direction as Direction, event.cameraId);
 
     const unityEnvelope = toUnitySpawnPayload(event);
     io.emit('spawn', event);
+    const emitMs = Date.now();
     io.emit('spawn_vehicle', unityEnvelope);
 
     // บันทึกหลัง emit — การเขียนไฟล์ต้องไม่หน่วง broadcast
     capture('spawn', event);
     capture('spawn_vehicle', unityEnvelope);
+    recordLatency(event.trackId, STAGE_VALIDATED, validatedMs);
+    recordLatency(event.trackId, STAGE_EMIT, emitMs);
 
     res.status(200).json({ ok: true });
   };
