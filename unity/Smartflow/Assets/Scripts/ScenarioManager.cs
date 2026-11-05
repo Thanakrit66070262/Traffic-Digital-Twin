@@ -19,25 +19,12 @@ public class ScenarioManager : MonoBehaviour
         public float[] laneOffsets = { 0f };
     }
 
-    // ===============================================
-    // 🟢 1. แยกตัวแปรจำกัดความเร็วสำหรับ Inbound และ Outbound 🟢
-    // ===============================================
-    [Header("Inbound Speed Settings")]
-    public float inboundMinSpeed = 40f;
-    public float inboundMaxSpeed = 80f;
-
-    [Header("Outbound Speed Settings")]
-    public float outboundMinSpeed = 40f;
-    public float outboundMaxSpeed = 80f;
-
     public float[] globalLaneOffsets = { -3.5f, 0f, 3.5f };
 
     // ความเร็วคำนวณจาก occupancy + flow ของ traffic_state (Little's Law) แทนการสุ่มตาม state
     [Header("Derived Speed (Little's Law)")]
     [Tooltip("ความยาวของ occupancyPolygon ตามแนวถนน (m) — polygon จริง 9.96 m (กว้าง) x 35 m (ยาว)")]
     public float occupancyZoneLengthMeters = 35f;
-    [Tooltip("สุ่มรอบค่าที่คำนวณได้ ±สัดส่วนนี้ ให้รถแต่ละคันไม่วิ่งเท่ากันเป๊ะ")]
-    [Range(0f, 0.5f)] public float derivedSpeedSpread = 0.15f;
     [Tooltip("occupancy ต่ำกว่านี้ถือว่าถนนว่าง คำนวณไม่ได้ → ใช้ช่วงความเร็วตาม state")]
     public float minOccupancyForDerivation = 0.5f;
     public float minDerivedSpeedKmh = 5f;
@@ -49,8 +36,42 @@ public class ScenarioManager : MonoBehaviour
     [Tooltip("Unity unit ต่อ 1 เมตรจริง = D_unity / D_real (82.51 / 75.48)")]
     public float worldUnitsPerMeter = 82.51f / 75.48f;
 
+    // รถติดเกิดที่คอขวด แล้วลามย้อนไปท้ายแถวเองผ่าน IDM — ไม่สั่งความเร็วใหม่ให้ทุกคันพร้อมกัน
+    [Header("Bottleneck")]
+    [Tooltip("index ของ waypoint ที่เป็นคอขวด (ใช้กับทั้งสอง route)")]
+    public int bottleneckWaypointIndex = 1;
+    [Tooltip("ช่วงก่อนถึงคอขวด (m จริง) ที่รถต้องวิ่งด้วยความเร็วคอขวด")]
+    public float bottleneckApproachMeters = 15f;
+    [Tooltip("ความเร็วถนนโล่ง (km/h) เมื่อยังคำนวณจากข้อมูลไม่ได้")]
+    public float freeFlowFallbackKmh = 50f;
+    [Tooltip("เวลาที่ความเร็วเป้าหมายค่อยๆ ไล่ไปค่าใหม่หลังได้ payload (s) — กันรถทั้งถนนกระตุกพร้อมกัน")]
+    public float speedTransitionSeconds = 2.5f;
+
+    [Header("Car Following (IDM)")]
+    [Tooltip("ส่วนเบี่ยงเบนมาตรฐานของนิสัยคนขับ (สัดส่วนของความเร็วเป้าหมาย)")]
+    [Range(0f, 0.3f)] public float driverFactorStdDev = 0.08f;
+    public IdmProfile carProfile = new IdmProfile(1.5f, 2f, 1.4f, 2f);
+    public IdmProfile motorcycleProfile = new IdmProfile(2.5f, 3f, 0.9f, 1f);
+    public IdmProfile truckProfile = new IdmProfile(0.8f, 1.5f, 1.8f, 3f);
+    public IdmProfile busProfile = new IdmProfile(0.8f, 1.5f, 1.8f, 3f);
+
     private const float SECONDS_PER_MINUTE = 60f;
     private const float MPS_TO_KMH = 3.6f;
+    // ความเร็วคอขวดเมื่อคำนวณจากข้อมูลไม่ได้ = ค่ากลางของช่วงความเร็วตาม state แบบเดิม
+    private const float SLOW_FALLBACK_KMH = 32f;
+    private const float HEAVY_FALLBACK_KMH = 15f;
+    // ตัด driverFactor ไว้ไม่ให้สุ่มได้คนขับที่ช้า/เร็วผิดปกติ
+    private const float MIN_DRIVER_FACTOR = 0.85f;
+    private const float MAX_DRIVER_FACTOR = 1.15f;
+    private const float SPAWN_RETRY_SECONDS = 0.5f;
+
+    private LaneSpeed _inboundSpeed;
+    private LaneSpeed _outboundSpeed;
+    // ตำแหน่งคอขวดบนแต่ละ route (m จริงจากจุด spawn)
+    private float _inboundBottleneckMeters = float.PositiveInfinity;
+    private float _outboundBottleneckMeters = float.PositiveInfinity;
+    // ระยะจาก pivot ถึงหน้ารถของแต่ละ prefab (Unity unit) — ใช้เช็คที่ว่างก่อนเบิกรถจาก pool
+    private readonly Dictionary<GameObject, float> _prefabFrontUnits = new Dictionary<GameObject, float>();
 
     private const string DEFAULT_TRAFFIC_STATE = "normal";
 
@@ -101,11 +122,58 @@ public class ScenarioManager : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        _inboundSpeed = new LaneSpeed(freeFlowFallbackKmh);
+        _outboundSpeed = new LaneSpeed(freeFlowFallbackKmh);
     }
 
     void Start()
     {
+        _inboundBottleneckMeters = GetBottleneckMeters(inboundRoute);
+        _outboundBottleneckMeters = GetBottleneckMeters(outboundRoute);
         StartCoroutine(ProcessNetworkSpawnQueue());
+    }
+
+    void Update()
+    {
+        _inboundSpeed.Step(Time.deltaTime);
+        _outboundSpeed.Step(Time.deltaTime);
+    }
+
+    private float GetBottleneckMeters(WaypointRoute route)
+    {
+        if (route == null || bottleneckWaypointIndex < 0 || bottleneckWaypointIndex >= route.waypoints.Count)
+        {
+            Debug.LogWarning($"[ScenarioManager] bottleneckWaypointIndex {bottleneckWaypointIndex} is outside route '{route?.name}'; bottleneck disabled.");
+            return float.PositiveInfinity;
+        }
+        return route.GetDistanceToWaypoint(bottleneckWaypointIndex) / worldUnitsPerMeter;
+    }
+
+    // ความเร็วที่รถคันหนึ่งอยากวิ่ง (m/s) ณ ระยะ s บน route
+    // ก่อนคอขวดค่อยๆ ลดลงให้เข้าโซนคอขวดพอดี, ผ่านคอขวดแล้วกลับไปความเร็วถนนโล่ง
+    public float GetDesiredSpeedMps(List<Transform> route, float distanceAlongRoute, IdmProfile profile, float driverFactor)
+    {
+        bool isInbound = inboundRoute != null && route == inboundRoute.waypoints;
+        LaneSpeed lane = isInbound ? _inboundSpeed : _outboundSpeed;
+        float bottleneckAt = isInbound ? _inboundBottleneckMeters : _outboundBottleneckMeters;
+
+        float freeMps = lane.Free / MPS_TO_KMH * driverFactor;
+        if (distanceAlongRoute > bottleneckAt) return freeMps;
+
+        float bottleneckMps = lane.Bottleneck / MPS_TO_KMH * driverFactor;
+        float distanceToZone = Mathf.Max(0f, bottleneckAt - bottleneckApproachMeters - distanceAlongRoute);
+        return IdmModel.DesiredSpeedNearBottleneck(freeMps, bottleneckMps, distanceToZone, profile.comfortDecel);
+    }
+
+    private IdmProfile GetProfileFor(VehicleType type)
+    {
+        switch (type)
+        {
+            case VehicleType.Motorcycle: return motorcycleProfile;
+            case VehicleType.Truck: return truckProfile;
+            case VehicleType.Bus: return busProfile;
+            default: return carProfile;
+        }
     }
 
     public int GetInboundTotal() => _inboundCumulative.Total;
@@ -169,38 +237,34 @@ public class ScenarioManager : MonoBehaviour
             DetectLaneChange(TrafficDirection.Inbound, currentInboundState, ref _inboundLevel);
             DetectLaneChange(TrafficDirection.Outbound, currentOutboundState, ref _outboundLevel);
 
-            SetSpeedBand(payload.zones.@in, currentInboundState, ref inboundMinSpeed, ref inboundMaxSpeed);
-            SetSpeedBand(payload.zones.@out, currentOutboundState, ref outboundMinSpeed, ref outboundMaxSpeed);
+            UpdateLaneSpeed(_inboundSpeed, payload.zones.@in, currentInboundState);
+            UpdateLaneSpeed(_outboundSpeed, payload.zones.@out, currentOutboundState);
         }
 
         OnTrafficStateChanged?.Invoke(payload);
         OnLiveFeedReceived?.Invoke(payload.cameraId, payload.timestamp);
 
-        // =======================================================
-        // 🟢 สั่งรันคลื่นจราจร (Wave) เปลี่ยนความเร็วรถเก่าแบบไล่ระดับ
-        // =======================================================
-        if (inboundRoute != null)
-            StartCoroutine(ApplySpeedGradientWave(inboundRoute, inboundMinSpeed, inboundMaxSpeed));
-            
-        if (outboundRoute != null)
-            StartCoroutine(ApplySpeedGradientWave(outboundRoute, outboundMinSpeed, outboundMaxSpeed));
-        
-        Debug.Log($"[Traffic Speed Updated] Inbound: {inboundMinSpeed}-{inboundMaxSpeed} km/h | Outbound: {outboundMinSpeed}-{outboundMaxSpeed} km/h");
+        Debug.Log($"[Traffic Speed Updated] Inbound: free {_inboundSpeed.FreeTarget:F0} / bottleneck {_inboundSpeed.BottleneckTarget:F0} km/h | " +
+                  $"Outbound: free {_outboundSpeed.FreeTarget:F0} / bottleneck {_outboundSpeed.BottleneckTarget:F0} km/h");
     }
-    // ใช้ความเร็วที่คำนวณจากข้อมูลจริงก่อน ถ้าคำนวณไม่ได้ (ถนนเกือบว่าง/ข้อมูลเสีย) ค่อยใช้ช่วงตาม state
-    private void SetSpeedBand(ZoneDetail zone, string state, ref float minSpeed, ref float maxSpeed)
+
+    // ถนนปกติ: ความเร็วที่วัดได้คือความเร็วถนนโล่ง ใช้ทั้งเส้น
+    // รถติด: ความเร็วที่วัดได้ใช้เฉพาะที่คอขวด ส่วนถนนโล่งคงค่าล่าสุดไว้ — แถวยาวย้อนหลังมาเองจาก IDM
+    private void UpdateLaneSpeed(LaneSpeed lane, ZoneDetail zone, string state)
     {
+        TrafficLevel level = TrafficLevelParser.Parse(state);
         float derived = DeriveZoneSpeedKmh(zone);
-        if (!float.IsNaN(derived))
+
+        if (level == TrafficLevel.Normal)
         {
-            minSpeed = Mathf.Max(minDerivedSpeedKmh, derived * (1f - derivedSpeedSpread));
-            maxSpeed = Mathf.Max(minSpeed, derived * (1f + derivedSpeedSpread));
+            float free = float.IsNaN(derived) ? freeFlowFallbackKmh : derived;
+            lane.SetTargets(free, free, speedTransitionSeconds);
             return;
         }
 
-        if (state == "standstill" || state == "high_density") { minSpeed = 10f; maxSpeed = 20f; }
-        else if (state == "slow_moving") { minSpeed = 25f; maxSpeed = 40f; }
-        else { minSpeed = 40f; maxSpeed = 70f; }
+        float fallback = level == TrafficLevel.Heavy ? HEAVY_FALLBACK_KMH : SLOW_FALLBACK_KMH;
+        float bottleneck = float.IsNaN(derived) ? fallback : derived;
+        lane.SetTargets(lane.FreeTarget, bottleneck, speedTransitionSeconds);
     }
 
     // Little's Law: เวลาที่รถอยู่ในโซน T = N / λ → ความเร็วเฉลี่ย v = L / T = L·λ / N
@@ -223,35 +287,6 @@ public class ScenarioManager : MonoBehaviour
 
         float speedKmh = occupancyZoneLengthMeters * flowPerSecond / zone.occupancy * MPS_TO_KMH;
         return Mathf.Clamp(speedKmh, minDerivedSpeedKmh, maxDerivedSpeedKmh);
-    }
-
-    private System.Collections.IEnumerator ApplySpeedGradientWave(WaypointRoute route, float minSpeed, float maxSpeed)
-    {
-        List<VehicleMovement> vehiclesInLane = new List<VehicleMovement>();
-        
-        foreach (GameObject vehicle in activeVehicles)
-        {
-            if (!vehicle.activeInHierarchy) continue;
-            
-            VehicleMovement vScript = vehicle.GetComponent<VehicleMovement>();
-            // เช็กว่ารถคันนี้กำลังวิ่งบนเส้นทาง (waypoints) ที่ส่งเข้ามาหรือไม่
-            if (vScript != null && vScript.waypoints == route.waypoints)
-            {
-                vehiclesInLane.Add(vScript);
-            }
-        }
-
-        // เรียงลำดับรถจาก Waypoint ไกลสุด (ปลายทาง) ย้อนกลับมาหาต้นทาง
-        vehiclesInLane.Sort((a, b) => b.currentWaypointIndex.CompareTo(a.currentWaypointIndex));
-
-        // ทยอยอัปเดตความเร็วทีละคันแบบไล่ระดับเวลา
-        foreach (VehicleMovement vScript in vehiclesInLane)
-        {
-            vScript.targetSpeed = UnityEngine.Random.Range(minSpeed, maxSpeed);
-            
-            // หน่วงเวลา 0.15 วินาทีก่อนส่งสัญญาณเบรก/เร่งให้รถคันถัดไปที่อยู่ด้านหลัง
-            yield return new UnityEngine.WaitForSeconds(0.15f); 
-        }
     }
 
     private IEnumerator ProcessNetworkSpawnQueue()
@@ -291,70 +326,32 @@ public class ScenarioManager : MonoBehaviour
                 }
                 
                 GameObject prefabToSpawn = selectedPrefabArray[Random.Range(0, selectedPrefabArray.Length)];
-                float randomLaneOffset = globalLaneOffsets[Random.Range(0, globalLaneOffsets.Length)];
-                Transform startPoint = selectedRoute.waypoints[0];
-                Vector3 finalSpawnPosition = startPoint.position + (startPoint.right * randomLaneOffset);
+                IdmProfile profile = GetProfileFor(vehicleType);
+                float driverFactor = SampleDriverFactor();
+                float frontMeters = GetPrefabFrontUnits(prefabToSpawn) / worldUnitsPerMeter;
 
-                // =========================================================================
-                // 🟢 4. ระบบเช็กพื้นที่ว่างก่อนเสก (Spawn Clearance Check) ป้องกันรถทับกัน
-                // =========================================================================
-                bool isSpawnAreaClear = false;
-                while (!isSpawnAreaClear)
+                // รอจนมีเลนที่ห่างจากคันท้ายแถวพอ — แถวรถติดยาวถึงจุด spawn ได้เพราะคอขวดอยู่ใกล้
+                float laneOffset;
+                float entrySpeedMps;
+                while (!TryPickSpawnLane(selectedRoute, profile, driverFactor, frontMeters, out laneOffset, out entrySpeedMps))
                 {
-                    // เช็กรัศมี 4 เมตร ว่ามีวัตถุอะไรขวางจุดเกิดหรือไม่ (ปรับตัวเลข 4f ได้ตามความยาวรถ)
-                    Collider[] hitColliders = Physics.OverlapSphere(finalSpawnPosition, 4f);
-                    bool foundVehicle = false;
-
-                    foreach (var hit in hitColliders)
-                    {
-                        // ถ้าวัตถุนั้นมีสคริปต์ VehicleMovement แปะอยู่ แปลว่าเป็นรถคันอื่น
-                        if (hit.transform.root.GetComponent<VehicleMovement>() != null)
-                        {
-                            foundVehicle = true;
-                            break; // เจอคันเดียวก็ถือว่าไม่ว่างแล้ว
-                        }
-                    }
-
-                    if (foundVehicle)
-                    {
-                        // ถ้ามีรถขวางอยู่ ให้รอ 0.5 วินาที แล้วกลับไปเช็กพื้นที่ใหม่
-                        yield return new WaitForSeconds(0.5f);
-                    }
-                    else
-                    {
-                        // พื้นที่โล่งแล้ว ทะลุลูปไปเสกรถได้เลย
-                        isSpawnAreaClear = true;
-                    }
+                    yield return new WaitForSeconds(SPAWN_RETRY_SECONDS);
                 }
-                // =========================================================================
 
-                // เบิกรถจาก Pool (จะทำงานก็ต่อเมื่อ isSpawnAreaClear เป็น true แล้วเท่านั้น)
+                Transform startPoint = selectedRoute.waypoints[0];
                 GameObject newVehicle = GetVehicleFromPool(prefabToSpawn);
-                newVehicle.transform.position = finalSpawnPosition;
+                newVehicle.transform.position = startPoint.position + (startPoint.right * laneOffset);
                 newVehicle.transform.rotation = startPoint.rotation;
 
                 VehicleMovement vehicleScript = newVehicle.GetComponent<VehicleMovement>();
-                
-                // =================================================================
-                // 🟢 3. จ่ายความเร็วให้รถตามเส้นทางที่รถคันนั้นกำลังวิ่ง 🟢
-                // =================================================================
-                float assignedTargetSpeed = 40f;
-                if (selectedRoute == inboundRoute)
-                {
-                    assignedTargetSpeed = Random.Range(inboundMinSpeed, inboundMaxSpeed);
-                }
-                else
-                {
-                    assignedTargetSpeed = Random.Range(outboundMinSpeed, outboundMaxSpeed);
-                }
-
-                vehicleScript.targetSpeed = assignedTargetSpeed;
-                vehicleScript.laneOffset = randomLaneOffset;
+                vehicleScript.laneOffset = laneOffset;
                 vehicleScript.waypoints = selectedRoute.waypoints;
+                vehicleScript.profile = profile;
+                vehicleScript.driverFactor = driverFactor;
+                vehicleScript.ResetVehicle(entrySpeedMps);
+                SmartFlow.Network.LatencyLog.Record(netData.trackId, SmartFlow.Network.LatencyLog.StageSpawned, SmartFlow.Network.LatencyLog.NowMs());
 
-                vehicleScript.ResetVehicle();
-
-                Debug.Log($"🚗 Spawn รถสำเร็จ: {netData.type} ฝั่ง {netData.direction} (Speed: {assignedTargetSpeed:F1} km/h)");
+                Debug.Log($"🚗 Spawn รถสำเร็จ: {netData.type} ฝั่ง {netData.direction} (Entry: {entrySpeedMps * MPS_TO_KMH:F1} km/h)");
 
                 yield return new WaitForSeconds(networkSpawnDelay);
             }
@@ -362,6 +359,84 @@ public class ScenarioManager : MonoBehaviour
             {
                 yield return null;
             }
+        }
+    }
+
+    // สุ่มลำดับเลนแล้วเลือกเลนแรกที่ห่างจากคันท้ายแถวเกิน minGap — false = ทุกเลนเต็ม
+    private bool TryPickSpawnLane(WaypointRoute route, IdmProfile profile, float driverFactor, float frontMeters,
+                                  out float laneOffset, out float entrySpeedMps)
+    {
+        float desiredMps = GetDesiredSpeedMps(route.waypoints, 0f, profile, driverFactor);
+        int laneCount = globalLaneOffsets.Length;
+        int startIndex = Random.Range(0, laneCount);
+
+        for (int i = 0; i < laneCount; i++)
+        {
+            float candidate = globalLaneOffsets[(startIndex + i) % laneCount];
+            VehicleMovement tail = LaneTrafficIndex.GetTail(route.waypoints, candidate);
+            float gap = tail == null ? float.PositiveInfinity : tail.RearPositionMeters - frontMeters;
+            if (gap < profile.minGap) continue;
+
+            laneOffset = candidate;
+            entrySpeedMps = IdmModel.SafeEntrySpeed(desiredMps, gap, tail == null ? 0f : tail.SpeedMps, profile);
+            return true;
+        }
+
+        laneOffset = 0f;
+        entrySpeedMps = 0f;
+        return false;
+    }
+
+    private float SampleDriverFactor()
+    {
+        // Box–Muller: สุ่มแบบ normal จาก uniform สองตัว
+        float u1 = 1f - Random.value; // (0, 1] กัน log(0)
+        float u2 = Random.value;
+        float standardNormal = Mathf.Sqrt(-2f * Mathf.Log(u1)) * Mathf.Cos(2f * Mathf.PI * u2);
+        return Mathf.Clamp(1f + standardNormal * driverFactorStdDev, MIN_DRIVER_FACTOR, MAX_DRIVER_FACTOR);
+    }
+
+    private float GetPrefabFrontUnits(GameObject prefab)
+    {
+        if (!_prefabFrontUnits.TryGetValue(prefab, out float frontUnits))
+        {
+            VehicleDimensions.Measure(prefab, out frontUnits, out _);
+            _prefabFrontUnits[prefab] = frontUnits;
+        }
+        return frontUnits;
+    }
+
+    // ความเร็วเป้าหมายของถนนหนึ่งฝั่ง — ค่าใหม่จาก payload ค่อยๆ ไล่ไปภายในเวลาที่กำหนด ไม่กระโดด
+    private class LaneSpeed
+    {
+        private const float MIN_TRANSITION_SECONDS = 0.01f;
+
+        public float FreeTarget { get; private set; }
+        public float BottleneckTarget { get; private set; }
+        public float Free { get; private set; }
+        public float Bottleneck { get; private set; }
+
+        private float _freeRate;
+        private float _bottleneckRate;
+
+        public LaneSpeed(float initialKmh)
+        {
+            FreeTarget = BottleneckTarget = Free = Bottleneck = initialKmh;
+        }
+
+        public void SetTargets(float freeKmh, float bottleneckKmh, float transitionSeconds)
+        {
+            float seconds = Mathf.Max(transitionSeconds, MIN_TRANSITION_SECONDS);
+            FreeTarget = freeKmh;
+            BottleneckTarget = bottleneckKmh;
+            _freeRate = Mathf.Abs(freeKmh - Free) / seconds;
+            _bottleneckRate = Mathf.Abs(bottleneckKmh - Bottleneck) / seconds;
+        }
+
+        public void Step(float dt)
+        {
+            Free = Mathf.MoveTowards(Free, FreeTarget, _freeRate * dt);
+            Bottleneck = Mathf.MoveTowards(Bottleneck, BottleneckTarget, _bottleneckRate * dt);
         }
     }
 
