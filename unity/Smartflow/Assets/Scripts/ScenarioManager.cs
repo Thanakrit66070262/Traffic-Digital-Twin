@@ -43,6 +43,12 @@ public class ScenarioManager : MonoBehaviour
     public float minDerivedSpeedKmh = 5f;
     public float maxDerivedSpeedKmh = 70f;
 
+    // โมเดล KMITL001 ใหญ่กว่าของจริง — วัดจุดคู่เดียวกัน: Google Maps 75.48 m, Unity 82.51 unit
+    // ความเร็วทุกค่าเป็นเมตรจริง จึงต้องคูณค่านี้ตอนแปลงเป็นระยะใน Unity ไม่งั้นรถดูช้ากว่าจริง ~9%
+    [Header("World Scale Calibration")]
+    [Tooltip("Unity unit ต่อ 1 เมตรจริง = D_unity / D_real (82.51 / 75.48)")]
+    public float worldUnitsPerMeter = 82.51f / 75.48f;
+
     private const float SECONDS_PER_MINUTE = 60f;
     private const float MPS_TO_KMH = 3.6f;
 

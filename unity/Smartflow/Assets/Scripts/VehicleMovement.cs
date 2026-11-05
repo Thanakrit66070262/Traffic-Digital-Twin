@@ -16,6 +16,7 @@ public class VehicleMovement : MonoBehaviour
         currentSpeed = targetSpeed;
     }
     private float currentSpeed;
+    private const float KMH_PER_MPS = 3.6f;
 
     [Header("Traffic AI Settings")]
     public float safeDistance = 5f; 
@@ -65,9 +66,10 @@ public class VehicleMovement : MonoBehaviour
             currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, Time.deltaTime * acceleration);
         }
 
-        // 5. วิ่งไปข้างหน้า (แปลงหน่วยเป็น km/h แล้ว)
-        float speedInMetersPerSecond = currentSpeed / 3.6f;
-        transform.Translate(Vector3.forward * speedInMetersPerSecond * Time.deltaTime);
+        // 5. วิ่งไปข้างหน้า: km/h → m/s → Unity unit/s (โมเดลฉากไม่ได้สเกล 1:1 กับเมตรจริง)
+        float speedInMetersPerSecond = currentSpeed / KMH_PER_MPS;
+        float worldUnitsPerMeter = ScenarioManager.Instance != null ? ScenarioManager.Instance.worldUnitsPerMeter : 1f;
+        transform.Translate(Vector3.forward * speedInMetersPerSecond * worldUnitsPerMeter * Time.deltaTime);
 
         // 6. ตรวจสอบว่าวิ่งมาถึงจุดนี้หรือยัง ถ้าถึงแล้วให้เปลี่ยนไปเป้าหมายถัดไป
         float distanceToTarget = Vector3.Distance(new Vector3(transform.position.x, 0, transform.position.z), 
