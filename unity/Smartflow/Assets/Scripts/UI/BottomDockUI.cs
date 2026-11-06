@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using SmartFlow.CameraControl;
 using TMPro;
 using UnityEngine;
@@ -7,7 +6,7 @@ using UnityEngine.UI;
 
 namespace SmartFlow.UI
 {
-    // แถบล่าง: ชื่อ scenario ปัจจุบัน, ปุ่มสลับ scene, ปุ่มมุมกล้อง
+    // แถบล่าง: ปุ่มสลับ scene, ปุ่มมุมกล้อง
     public class BottomDockUI : MonoBehaviour
     {
         [Serializable]
@@ -31,7 +30,7 @@ namespace SmartFlow.UI
             if (_currentSceneButton != null)
                 _currentSceneButton.interactable = false;
 
-            PopulateScenarios();
+            HideScenarioDropdown();
             BindCameraButtons();
         }
 
@@ -72,36 +71,11 @@ namespace SmartFlow.UI
                     cb.button.interactable = !active.HasValue || cb.preset != active.Value;
         }
 
-        private void PopulateScenarios()
+        // ระบบ scenario ถูกถอดออกแล้ว — ซ่อน dropdown ที่ยังค้างอยู่ใน scene จนกว่าจะลบ object ทิ้ง
+        private void HideScenarioDropdown()
         {
-            if (_scenarioDropdown == null) return;
-
-            ScenarioManager manager = ScenarioManager.Instance;
-            if (manager == null)
-            {
-                Debug.LogError("[BottomDockUI] ScenarioManager.Instance not found; hiding scenario dropdown.");
+            if (_scenarioDropdown != null)
                 _scenarioDropdown.gameObject.SetActive(false);
-                return;
-            }
-
-            var names = new List<string>();
-            if (manager.scenarios != null)
-            {
-                foreach (ScenarioManager.ScenarioConfig scenario in manager.scenarios)
-                    names.Add(string.IsNullOrEmpty(scenario.scenarioName) ? "Unnamed" : scenario.scenarioName);
-            }
-
-            if (names.Count == 0)
-            {
-                _scenarioDropdown.gameObject.SetActive(false);
-                return;
-            }
-
-            _scenarioDropdown.ClearOptions();
-            _scenarioDropdown.AddOptions(names);
-            _scenarioDropdown.SetValueWithoutNotify(0);
-            // ยังไม่มี logic สลับ scenario (ScenarioConfig ไม่ถูกนำไปใช้ที่ไหน) จึงแสดงอย่างเดียว ไม่ให้เลือก
-            _scenarioDropdown.interactable = false;
         }
     }
 }

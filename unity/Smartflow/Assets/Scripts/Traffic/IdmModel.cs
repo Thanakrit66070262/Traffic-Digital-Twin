@@ -53,14 +53,20 @@ namespace SmartFlow.Traffic
             float interactionTerm = 0f;
             if (!float.IsPositiveInfinity(gap))
             {
-                float brakingTerm = speed * approachRate / (2f * Mathf.Sqrt(maxAccel * Mathf.Max(p.comfortDecel, MIN_PARAM)));
-                float desiredGap = p.minGap + Mathf.Max(0f, speed * p.timeHeadway + brakingTerm);
-                float ratio = desiredGap / Mathf.Max(gap, MIN_GAP);
+                float ratio = DesiredGap(speed, approachRate, p) / Mathf.Max(gap, MIN_GAP);
                 interactionTerm = ratio * ratio;
             }
 
             float accel = maxAccel * (1f - freeTerm - interactionTerm);
             return Mathf.Clamp(accel, -MAX_DECEL, maxAccel);
+        }
+
+        // s* ของ IDM: ระยะที่คนขับอยากเว้นจากคันหน้า ณ ความเร็วและอัตราเข้าใกล้ขณะนั้น
+        public static float DesiredGap(float speed, float approachRate, IdmProfile p)
+        {
+            float maxAccel = Mathf.Max(p.maxAccel, MIN_PARAM);
+            float brakingTerm = speed * approachRate / (2f * Mathf.Sqrt(maxAccel * Mathf.Max(p.comfortDecel, MIN_PARAM)));
+            return p.minGap + Mathf.Max(0f, speed * p.timeHeadway + brakingTerm);
         }
 
         // ความเร็วเป้าหมายก่อนถึงโซนคอขวด: ลดลงแบบเบรกสบายให้เข้าโซนพอดีที่ bottleneckSpeed
